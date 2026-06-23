@@ -94,11 +94,13 @@ with analytics_tab:
 
     st.divider()
     st.subheader("Sources breakdown")
-    sample = collection.get(limit=min(total, 10000), include=["metadatas"])
+    SAMPLE_LIMIT = 300
+    sample = collection.get(limit=min(total, SAMPLE_LIMIT), include=["metadatas"])
     counts = Counter(m["source"] for m in sample["metadatas"])
     if counts:
+        st.caption(f"Sampled {min(total, SAMPLE_LIMIT):,} of {total:,} chunks (Chroma Cloud free-tier cap).")
         st.dataframe(
-            [{"source": k, "chunks": v} for k, v in counts.most_common()],
+            [{"source": k, "chunks_in_sample": v} for k, v in counts.most_common()],
             use_container_width=True,
             hide_index=True,
         )
