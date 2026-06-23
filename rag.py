@@ -18,26 +18,84 @@ import chromadb
 
 import config
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 
 def get_collection():
-    client = chromadb.PersistentClient(path=str(config.CHROMA_DIR))
+    if config.CHROMA_API_KEY and config.CHROMA_TENANT and config.CHROMA_DATABASE:
+        client = chromadb.CloudClient(
+            api_key=config.CHROMA_API_KEY,
+            tenant=config.CHROMA_TENANT,
+            database=config.CHROMA_DATABASE,
+        )
+    else:
+        client = chromadb.PersistentClient(path=str(config.CHROMA_DIR))
     try:
         return client.get_collection(name=config.COLLECTION_NAME)
     except Exception:
         sys.exit("No collection found. Run `python ingest.py` first.")
 
 
+STOPWORDS = {
+    "what","is","the","a","an","of","in","on","to","for","and","or","by","with","how","why","does",
+    "do","are","be","was","were","this","that","it","as","at","from","i","you","we","they","but",
+    "if","then","than","there","here","which","who","whom","whose","when","where","into","about",
+}
+
+
+def extract_keywords(question: str, max_terms: int = 4) -> list[str]:
+    tokens = [t.strip(".,?!:;()[]\"'").lower() for t in question.split()]
+    seen: set[str] = set()
+    out: list[str] = []
+    for t in tokens:
+        if len(t) > 2 and t not in STOPWORDS and t not in seen:
+            seen.add(t)
+            out.append(t)
+        if len(out) >= max_terms:
+            break
+    return out
+
+
 def retrieve(collection, question: str, k: int):
-    res = collection.query(query_texts=[question], n_results=k)
-    docs = res["documents"][0]
-    metas = res["metadatas"][0]
-    dists = res["distances"][0]
-    return list(zip(docs, metas, dists))
+    vec_hits = collection.query(query_texts=[question], n_results=k)
+    results: dict[str, tuple[str, dict, float, str]] = {}
+    for doc, meta, dist, _id in zip(
+        vec_hits["documents"][0],
+        vec_hits["metadatas"][0],
+        vec_hits["distances"][0],
+        vec_hits["ids"][0],
+    ):
+        results[_id] = (doc, meta, dist, "vector")
+
+    for kw in extract_keywords(question):
+        try:
+            kw_hits = collection.query(
+                query_texts=[question],
+                n_results=k,
+                where_document={"$contains": kw},
+            )
+        except Exception:
+            continue
+        for doc, meta, dist, _id in zip(
+            kw_hits["documents"][0],
+            kw_hits["metadatas"][0],
+            kw_hits["distances"][0],
+            kw_hits["ids"][0],
+        ):
+            if _id in results:
+                d0, m0, dist0, src0 = results[_id]
+                results[_id] = (d0, m0, dist0, src0 + "+keyword")
+            else:
+                results[_id] = (doc, meta, dist, f"keyword:{kw}")
+
+    ranked = sorted(results.values(), key=lambda r: r[2])[:k]
+    return [(doc, meta, dist, src) for doc, meta, dist, src in ranked]
 
 
 def build_prompt(question: str, hits) -> str:
     blocks = []
-    for i, (doc, meta, _dist) in enumerate(hits, 1):
+    for i, (doc, meta, _dist, _src) in enumerate(hits, 1):
         blocks.append(f"[{i}] (source: {meta['source']})\n{doc}")
     context = "\n\n".join(blocks)
     return (
@@ -52,9 +110,9 @@ def build_prompt(question: str, hits) -> str:
 def generate(prompt: str) -> str:
     from openai import OpenAI
 
-    client = OpenAI(api_key=config.OPENROUTER_API_KEY, base_url=config.OPENROUTER_BASE_URL)
+    client = OpenAI(api_key=config.LLM_API_KEY, base_url=config.LLM_BASE_URL)
     resp = client.chat.completions.create(
-        model=config.MODEL,
+        model=config.TEXT_MODEL,
         max_tokens=config.MAX_TOKENS,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -67,15 +125,15 @@ def answer(collection, question: str) -> None:
         print("No relevant chunks found.")
         return
 
-    if config.OPENROUTER_API_KEY:
+    if config.LLM_API_KEY:
         print("\n" + generate(build_prompt(question, hits)) + "\n")
     else:
-        print("\n[OPENROUTER_API_KEY not set - showing retrieved context only]\n")
+        print(f"\n[LLM provider '{config.LLM_PROVIDER}' not configured - showing retrieved context only]\n")
 
     print("--- sources ---")
-    for i, (doc, meta, dist) in enumerate(hits, 1):
+    for i, (doc, meta, dist, src) in enumerate(hits, 1):
         snippet = doc[:140].replace("\n", " ")
-        print(f"[{i}] {meta['source']} (distance {dist:.3f}): {snippet}...")
+        print(f"[{i}] {meta['source']} (d={dist:.3f}, via {src}): {snippet}...")
 
 
 def main() -> None:

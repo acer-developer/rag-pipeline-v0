@@ -19,8 +19,21 @@ CHROMA_TENANT = os.getenv("CHROMA_TENANT", "")
 CHROMA_DATABASE = os.getenv("CHROMA_DATABASE", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-VISION_MODEL = "anthropic/claude-sonnet-4.5"
-TEXT_MODEL = "anthropic/claude-sonnet-4.5"
+
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+OLLAMA_API_KEY = "ollama"
+
+if LLM_PROVIDER == "ollama":
+    LLM_BASE_URL = OLLAMA_BASE_URL
+    LLM_API_KEY = OLLAMA_API_KEY
+    TEXT_MODEL = os.getenv("TEXT_MODEL", "llama3.1:8b")
+    VISION_MODEL = os.getenv("VISION_MODEL", "llama3.2-vision:11b")
+else:
+    LLM_BASE_URL = OPENROUTER_BASE_URL
+    LLM_API_KEY = OPENROUTER_API_KEY
+    TEXT_MODEL = os.getenv("TEXT_MODEL", "anthropic/claude-sonnet-4.5")
+    VISION_MODEL = os.getenv("VISION_MODEL", "anthropic/claude-sonnet-4.5")
 DATA_DIR = PROJECT_DIR / "data"          # source documents (.txt / .md) live here
 CHROMA_DIR = PROJECT_DIR / "chroma_db"   # persistent on-disk vector store
 
