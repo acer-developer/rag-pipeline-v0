@@ -19,8 +19,8 @@ def get_collection():
 
 collection = get_collection()
 
-st.title("Annual Report RAG — V0")
-st.caption(f"Provider: `{config.LLM_PROVIDER}` · Model: `{config.TEXT_MODEL}` · Vector store: Chroma Cloud / `{config.CHROMA_DATABASE}`")
+st.title("Annual Report RAG - V0")
+st.caption(f"Provider: `{config.LLM_PROVIDER}` | Model: `{config.TEXT_MODEL}` | Vector store: Chroma Cloud / `{config.CHROMA_DATABASE}`")
 
 chat_tab, analytics_tab = st.tabs(["💬 Chat", "📈 Analytics"])
 

@@ -50,4 +50,4 @@ CHUNK_OVERLAP = 150    # characters shared between consecutive chunks
 TOP_K = 4              # how many chunks to retrieve per query
 
 MODEL = TEXT_MODEL
-MAX_TOKENS = 1024
+MAX_TOKENS = 400
