@@ -4,7 +4,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-PROJECT_DIR = Path(__file__).parent
+APP_DIR = Path(__file__).parent
+PROJECT_DIR = APP_DIR.parent
 GLOBAL_ENV = Path.home() / ".env"
 LOCAL_ENV = PROJECT_DIR / ".env"
 

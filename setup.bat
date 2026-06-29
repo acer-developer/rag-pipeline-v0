@@ -24,7 +24,7 @@ if exist ".venv\Scripts\python.exe" (
 )
 
 echo Installing Python dependencies...
-uv pip install --python .venv -r requirements.txt
+uv pip install --python .venv -r webapp\requirements.txt
 if errorlevel 1 ( echo [ERROR] pip install failed. & pause & exit /b 1 )
 
 echo.

@@ -29,7 +29,7 @@ setup.bat
 notepad .env
 
 # Index the sample TATA annual report into Chroma
-.venv\Scripts\python.exe ingest.py
+.venv\Scripts\python.exe webapp\ingest.py
 
 # Launch the app (Streamlit + ngrok tunnel)
 start.bat
@@ -44,23 +44,29 @@ To stop: close the launcher window OR run `stop.bat`.
 
 ```
 .
-|-- app.py             Streamlit chat UI (chat + analytics tabs, mode selector)
-|-- launcher.py        Auto-finds ngrok/ollama, kills stale processes, opens browser
-|-- ingest.py          Orchestrator: calls stage1 then stage2
-|-- rag.py             Hybrid retrieval: vector + keyword + merge
-|-- config.py          Reads .env, exposes settings (LLM provider, chunk sizes, etc.)
-|-- start.bat          One-click launch (calls launcher.py)
+|-- start.bat          One-click launch (calls webapp/launcher.py)
 |-- stop.bat           Kill streamlit + ngrok
 |-- setup.bat          One-time deps + Ollama model install
-|-- requirements.txt   Python deps
-|-- .env.example       Template for secrets - copy to .env
+|-- README.md
+|-- .env.example       Template for secrets - copy to .env (kept at project root)
+|-- .gitignore
 |
 |-- input/             Drop your .pdf / .md / .txt source files here
+|
 |-- stage1/            Stage 1 module + its output markdowns
 |   |-- extract.py     PDF -> markdown (PyMuPDF text + Ollama vision)
 |   `-- *.md           One markdown per input file (output of stage 1)
-`-- stage2/            Stage 2 module
-    `-- push.py        Chunk markdowns + upsert to Chroma Cloud
+|
+|-- stage2/            Stage 2 module
+|   `-- push.py        Chunk markdowns + upsert to Chroma Cloud
+|
+`-- webapp/            Web app + orchestrator
+    |-- app.py         Streamlit chat UI (chat + analytics tabs, mode selector)
+    |-- launcher.py    Auto-finds ngrok/ollama, kills stale processes, opens browser
+    |-- ingest.py      Orchestrator: calls stage1 then stage2
+    |-- rag.py         Hybrid retrieval: vector + keyword + merge
+    |-- config.py      Reads .env (from project root), exposes settings
+    `-- requirements.txt
 ```
 
 ## Configuration

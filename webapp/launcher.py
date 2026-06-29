@@ -11,7 +11,8 @@ import webbrowser
 from pathlib import Path
 
 
-PROJECT = Path(__file__).parent
+APP_DIR = Path(__file__).parent
+PROJECT = APP_DIR.parent
 VENV_PY = PROJECT / ".venv" / "Scripts" / "python.exe"
 STREAMLIT_PORT = 8501
 NGROK_API = "http://localhost:4040/api/tunnels"
@@ -119,9 +120,9 @@ def main() -> int:
 
     print("Starting Streamlit...")
     streamlit_proc = subprocess.Popen(
-        [str(VENV_PY), "-m", "streamlit", "run", "app.py",
+        [str(VENV_PY), "-m", "streamlit", "run", str(APP_DIR / "app.py"),
          "--server.port", str(STREAMLIT_PORT), "--server.headless", "true"],
-        cwd=str(PROJECT),
+        cwd=str(APP_DIR),
     )
 
     local_url = f"http://localhost:{STREAMLIT_PORT}"
