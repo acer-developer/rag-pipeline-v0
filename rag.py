@@ -57,37 +57,40 @@ def extract_keywords(question: str, max_terms: int = 4) -> list[str]:
     return out
 
 
-def retrieve(collection, question: str, k: int):
-    vec_hits = collection.query(query_texts=[question], n_results=k)
+def retrieve(collection, question: str, k: int, mode: str = "hybrid"):
     results: dict[str, tuple[str, dict, float, str]] = {}
-    for doc, meta, dist, _id in zip(
-        vec_hits["documents"][0],
-        vec_hits["metadatas"][0],
-        vec_hits["distances"][0],
-        vec_hits["ids"][0],
-    ):
-        results[_id] = (doc, meta, dist, "vector")
 
-    for kw in extract_keywords(question):
-        try:
-            kw_hits = collection.query(
-                query_texts=[question],
-                n_results=k,
-                where_document={"$contains": kw},
-            )
-        except Exception:
-            continue
+    if mode in ("semantic", "hybrid"):
+        vec_hits = collection.query(query_texts=[question], n_results=k)
         for doc, meta, dist, _id in zip(
-            kw_hits["documents"][0],
-            kw_hits["metadatas"][0],
-            kw_hits["distances"][0],
-            kw_hits["ids"][0],
+            vec_hits["documents"][0],
+            vec_hits["metadatas"][0],
+            vec_hits["distances"][0],
+            vec_hits["ids"][0],
         ):
-            if _id in results:
-                d0, m0, dist0, src0 = results[_id]
-                results[_id] = (d0, m0, dist0, src0 + "+keyword")
-            else:
-                results[_id] = (doc, meta, dist, f"keyword:{kw}")
+            results[_id] = (doc, meta, dist, "vector")
+
+    if mode in ("keyword", "hybrid"):
+        for kw in extract_keywords(question):
+            try:
+                kw_hits = collection.query(
+                    query_texts=[question],
+                    n_results=k,
+                    where_document={"$contains": kw},
+                )
+            except Exception:
+                continue
+            for doc, meta, dist, _id in zip(
+                kw_hits["documents"][0],
+                kw_hits["metadatas"][0],
+                kw_hits["distances"][0],
+                kw_hits["ids"][0],
+            ):
+                if _id in results:
+                    d0, m0, dist0, src0 = results[_id]
+                    results[_id] = (d0, m0, dist0, src0 + "+keyword")
+                else:
+                    results[_id] = (doc, meta, dist, f"keyword:{kw}")
 
     ranked = sorted(results.values(), key=lambda r: r[2])[:k]
     return [(doc, meta, dist, src) for doc, meta, dist, src in ranked]

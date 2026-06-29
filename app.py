@@ -22,6 +22,16 @@ collection = get_collection()
 st.title("Annual Report RAG - V0")
 st.caption(f"Provider: `{config.LLM_PROVIDER}` | Model: `{config.TEXT_MODEL}` | Vector store: Chroma Cloud / `{config.CHROMA_DATABASE}`")
 
+with st.sidebar:
+    st.header("Retrieval settings")
+    mode = st.radio(
+        "Search mode",
+        ["hybrid", "semantic", "keyword"],
+        index=0,
+        help="hybrid = vector + keyword merged (default). semantic = pure vector similarity. keyword = $contains filter only.",
+    )
+    st.caption(f"Top-K: {config.TOP_K}")
+
 chat_tab, analytics_tab = st.tabs(["💬 Chat", "📈 Analytics"])
 
 
@@ -50,7 +60,7 @@ with chat_tab:
         with st.chat_message("assistant"):
             with st.spinner("Retrieving + generating…"):
                 t0 = time.time()
-                hits = rag.retrieve(collection, question, config.TOP_K)
+                hits = rag.retrieve(collection, question, config.TOP_K, mode=mode)
                 if not hits:
                     answer = "_No relevant chunks found in the indexed documents._"
                 elif config.LLM_API_KEY:
