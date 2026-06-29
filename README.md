@@ -1,156 +1,119 @@
 # Rag Pipeline - V0
 
 Two-stage Retrieval-Augmented Generation pipeline for annual reports.
-ChromaDB Cloud for vector storage, Ollama (local, free) for the LLM,
-Streamlit frontend for chat.
+ChromaDB Cloud for the vector store, Ollama (local, free) for the LLM,
+Streamlit for the chat UI. Includes a sample TATA annual report.
 
-## Architecture
+## Quick start (3 prerequisites, ~10 min one-time)
 
-```
-┌──────────────┐   ┌──────────────────┐   ┌─────────────────┐   ┌────────────┐
-│ data/*.pdf   │ → │ STAGE 1          │ → │ STAGE 2         │ → │ Chroma     │
-│ data/*.md    │   │ extract_pdf()    │   │ chunk + upsert  │   │ Cloud      │
-│ data/*.txt   │   │ + Ollama vision  │   │ (250/batch)     │   │ 2150 chunks│
-└──────────────┘   └────────┬─────────┘   └─────────────────┘   └─────┬──────┘
-                            ↓                                          ↑
-                   stage1_output/*.md                                  │
-                   (one .md per source                                 │
-                    + vision captions)                                 │
-                                                                       │
-                                          ┌────────────────────────────┘
-                                          │
-                                          ↓
-                                   ┌──────────────┐   ┌──────────────┐
-                                   │ rag.py       │ → │ Ollama LLM   │
-                                   │ hybrid       │   │ llama3.1:8b  │
-                                   │ retrieve     │   │ (local)      │
-                                   └──────┬───────┘   └──────────────┘
-                                          ↓
-                                   ┌──────────────┐
-                                   │ app.py       │
-                                   │ Streamlit UI │
-                                   │ localhost:   │
-                                   │ 8501         │
-                                   └──────────────┘
-```
+Install these once, then any clone-and-run after is two clicks:
 
-## Folder layout
+1. **uv** (Python package manager) -
+   ```powershell
+   powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+   ```
+2. **Ollama** (local LLM runtime) - https://ollama.com/download
+3. **ngrok** (optional, only if you want a public URL) - https://ngrok.com/download
+   then sign up free and run: `ngrok config add-authtoken <your-token>`
 
-| Folder | What goes in | Who writes here |
-|---|---|---|
-| `data/` | **Drop your PDFs / .md / .txt source files here.** This is the only input folder. | You (manually) |
-| `stage1_output/` | Per-source markdown files produced by Stage 1 (text + vision captions). | `ingest.py` Stage 1 |
-| `chroma_db/` | Used only if you fall back to local Chroma (unused in cloud mode). | `ingest.py` Stage 2 (local mode only) |
-
-## Setup
+## Clone and run
 
 ```powershell
-# 1. Create venv (one-time)
-uv venv --python 3.11 .venv
-uv pip install --python .venv -r requirements.txt
+git clone https://github.com/acer-developer/rag-pipeline-v0.git
+cd rag-pipeline-v0
 
-# 2. Install Ollama and pull the model
-irm https://ollama.com/install.ps1 | iex
-ollama pull llama3.1:8b
-# optional vision model for chart pages:
-ollama pull llama3.2-vision:11b
+# One-time setup (creates venv, installs deps, pulls Ollama model)
+setup.bat
 
-# 3. Put your secrets in C:\Users\<you>\.env  (NOT in this folder)
-#    See .env.example for the required keys.
-```
+# Edit .env and fill in your Chroma Cloud keys (or skip - falls back to local Chroma)
+notepad .env
 
-`.env` lives at `~/.env` (user home). The project's `config.py` loads it from there so secrets never enter the repo.
-
-## How to run end-to-end
-
-### Step 1 — Drop your source documents
-
-Put your source files in **`data/`**. Examples:
-
-```
-data/
-  TATA annual report.pdf      ← put your PDF here
-  some_other_doc.md
-```
-
-Supported: `.pdf`, `.md`, `.txt`.
-
-### Step 2 — Run ingest (both stages)
-
-```powershell
+# Index the sample TATA annual report into Chroma
 .venv\Scripts\python.exe ingest.py
+
+# Launch the app (Streamlit + ngrok tunnel)
+start.bat
 ```
 
-What happens:
+Browser opens automatically to http://localhost:8501. Public URL (if ngrok is set up)
+prints in the launcher window.
 
-- **Stage 1** (`ingest.py:88` — `stage1_extract()`)
-  - For every file in `data/`:
-    - PDF → PyMuPDF reads the text layer. If a page has images + little text, the page is rendered to PNG and sent to the Ollama vision model (`llama3.2-vision:11b`) for caption.
-    - .md / .txt → copied through unchanged.
-  - Output written to **`stage1_output/<filename>.md`** (one .md per source file).
+To stop: close the launcher window OR run `stop.bat`.
 
-- **Stage 2** (`ingest.py:115` — `stage2_chunk_and_push()`)
-  - Reads all `.md` files from `stage1_output/`.
-  - Chunks each one (1000 chars, 150 overlap — see `config.py:CHUNK_SIZE`).
-  - Upserts to Chroma Cloud in batches of 250 (free-tier cap is 300/request).
+## Project layout
 
-### Step 2b — Already have a stage-1 markdown? Skip stage 1 entirely
-
-If you've already extracted the markdown elsewhere (e.g. from another tool, or this pipeline produced it earlier), **drop the .md file directly into `stage1_output/`** and run only stage 2:
-
-```powershell
-.venv\Scripts\python.exe -c "from pathlib import Path; import ingest; ingest.stage2_chunk_and_push(sorted(ingest.STAGE1_DIR.glob('*.md')))"
+```
+.
+|-- app.py            Streamlit chat UI (chat + analytics tabs, mode selector)
+|-- launcher.py       Auto-finds ngrok/ollama, kills stale processes, opens browser
+|-- ingest.py         Stage 1 (PDF -> markdown) + Stage 2 (chunk -> Chroma)
+|-- rag.py            Hybrid retrieval: vector + keyword + merge
+|-- config.py         Reads .env, exposes settings (LLM provider, chunk sizes, etc.)
+|-- start.bat         One-click launch (calls launcher.py)
+|-- stop.bat          Kill streamlit + ngrok
+|-- setup.bat         One-time deps + Ollama model install
+|-- requirements.txt  Python deps (chromadb, openai, streamlit, pymupdf, dotenv)
+|-- .env.example      Template for secrets - copy to .env
+|-- data/             Source documents (.pdf, .md, .txt) - drop your inputs here
+|-- stage1_output/    Per-source markdown from stage 1 (text + vision captions)
 ```
 
-The exact loading code is in **`ingest.py:115-141`** — it reads every `.md` in `stage1_output/`, chunks via `chunk_text()` (`ingest.py:21`), and upserts.
+## Configuration
 
-### Step 3 — Launch the frontend
+Settings live in `config.py`. Override via environment variables or `.env`:
 
-```powershell
-.venv\Scripts\python.exe -m streamlit run app.py
-```
-
-Opens at **http://localhost:8501**.
-
-- **💬 Chat tab** — ask anything. Sources hidden behind an expander.
-- **📈 Analytics tab** — chunk count, model info, sources breakdown (sampled to 300 due to Chroma free-tier limit).
-
-## Configuration knobs
-
-All in `config.py`:
-
-| Variable | Default | Meaning |
+| Setting | Default | Notes |
 |---|---|---|
-| `LLM_PROVIDER` | `ollama` | Switch to `openrouter` to use a cloud LLM instead |
+| `LLM_PROVIDER` | `ollama` | `ollama` or `openrouter` |
 | `TEXT_MODEL` | `llama3.1:8b` | Generation model |
-| `VISION_MODEL` | `llama3.2-vision:11b` | Used in stage 1 for image-heavy pages |
-| `CHUNK_SIZE` | `1000` chars | Chunk window |
-| `CHUNK_OVERLAP` | `150` chars | Overlap between consecutive chunks |
-| `TOP_K` | `4` | Chunks retrieved per query |
+| `VISION_MODEL` | `llama3.2-vision:11b` | For chart/image pages in stage 1 |
+| `CHUNK_SIZE` | 1000 chars | Edit in config.py |
+| `CHUNK_OVERLAP` | 150 chars | Edit in config.py |
+| `TOP_K` | 4 | Chunks retrieved per query |
+| `MAX_TOKENS` | 400 | LLM response length cap |
 
-## Retrieval mode
+## Retrieval modes
 
-Hybrid (`rag.py:retrieve`):
+Sidebar in the Streamlit app lets you switch:
 
-1. Vector similarity (Chroma embedding search) — top K
-2. For each non-stopword keyword in the question: Chroma `where_document={"$contains": kw}` filtered search — top K
-3. Merge by id, rank by vector distance, return top K
+- **hybrid** (default) - vector similarity + Chroma `$contains` keyword filter, merged
+- **semantic** - pure vector similarity only
+- **keyword** - chunks must literally contain extracted query terms
 
-Each surfaced chunk is tagged in the UI with `via vector`, `via vector+keyword`, etc. so you can see why it came back.
+Each chunk's source label shows which mode(s) surfaced it:
+`via vector`, `via vector+keyword`, `via keyword:foo`, etc.
 
-## Public access (testing from another location)
+## Pipeline details
 
-GitHub Pages won't work (it's static-only). Two options to expose your local Streamlit:
+### Stage 1 - extract source documents to markdown
+`ingest.py` reads everything in `data/`:
+- `.pdf` -> PyMuPDF text extraction; image-heavy pages rendered to PNG and
+  captioned by Ollama vision model
+- `.md` / `.txt` -> copied through
 
-```powershell
-# ngrok (easiest)
-ngrok http 8501
-# Cloudflare Tunnel
-cloudflared tunnel --url http://localhost:8501
-```
+Output: one `.md` file per source under `stage1_output/`. You can also drop a
+pre-made `.md` directly into `stage1_output/` and skip stage 1 entirely.
 
-Your laptop must stay on; Ollama must be running.
+### Stage 2 - chunk + push to Chroma
+- Reads every `.md` from `stage1_output/`
+- Chunks at 1000 chars with 150 overlap
+- Upserts to Chroma Cloud in batches of 250 (free-tier cap is 300/op)
+
+### Retrieval (rag.py)
+1. Vector similarity query (top K)
+2. For each extracted keyword: Chroma `$contains` query (top K)
+3. Merge by chunk id, sort by vector distance, return top K
+
+## Public URL via ngrok
+
+`launcher.py` auto-starts ngrok if it's on PATH or in common install locations.
+Free-tier ngrok gives a stable random URL like `https://xxxx.ngrok-free.dev`.
+First-time visitors see a one-click splash screen (ngrok's abuse prevention).
+
+To get a custom name (e.g. `acer-rag.ngrok.app`), upgrade to ngrok Pro
+(\$10/mo). For a free permanent custom URL on your own domain, use
+Cloudflare Tunnel instead.
 
 ## Cost
 
-Zero. Chroma Cloud free tier (300 records/op, plenty for a single report) + Ollama running locally on your CPU/GPU.
+Zero. Chroma Cloud free tier + Ollama local + ngrok free tier.

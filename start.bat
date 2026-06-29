@@ -3,9 +3,7 @@ title Rag Pipeline V0
 pushd "%~dp0"
 
 if not exist ".venv\Scripts\python.exe" (
-  echo [ERROR] .venv not found. Run setup first:
-  echo   uv venv --python 3.11 .venv
-  echo   uv pip install --python .venv -r requirements.txt
+  echo [ERROR] .venv not found. Run setup.bat first.
   pause
   exit /b 1
 )
