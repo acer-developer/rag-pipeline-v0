@@ -34,8 +34,9 @@ else:
     LLM_API_KEY = OPENROUTER_API_KEY
     TEXT_MODEL = os.getenv("TEXT_MODEL", "anthropic/claude-sonnet-4.5")
     VISION_MODEL = os.getenv("VISION_MODEL", "anthropic/claude-sonnet-4.5")
-DATA_DIR = PROJECT_DIR / "data"          # source documents (.txt / .md) live here
-CHROMA_DIR = PROJECT_DIR / "chroma_db"   # persistent on-disk vector store
+INPUT_DIR = PROJECT_DIR / "input"
+STAGE1_DIR = PROJECT_DIR / "stage1"
+CHROMA_DIR = PROJECT_DIR / "chroma_db"
 
 # --- Vector store ---
 COLLECTION_NAME = "knowledge_base"
